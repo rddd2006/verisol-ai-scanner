@@ -1,0 +1,214 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 2rem;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    color: #fff;
+}
+
+/* --- MAIN LAYOUT STYLES --- */
+.main-layout {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.input-column {
+    flex: 1;
+    position: sticky;
+    top: 2rem;
+}
+
+.results-column {
+    flex: 2;
+}
+
+.input-card, .error-card, .results-card, .loading-card {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Tabs and Inputs */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 1.5rem;
+}
+
+.tab {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+    border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+    color: #818cf8;
+    border-bottom-color: #818cf8;
+    font-weight: 600;
+}
+
+.input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+input, textarea {
+    width: 95%;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    padding: 0.75rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+textarea {
+    resize: vertical;
+}
+
+button {
+    background-color: #4f46e5;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    align-self: flex-start;
+}
+
+button:disabled {
+    background-color: #312e81;
+    cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+    background-color: #6366f1;
+}
+
+/* Reports and Alerts */
+.error-card {
+    background-color: #4c1d1d;
+    border-color: #e11d48;
+    color: #fecaca;
+}
+
+.dynamic-reports {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.report-box {
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-box h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.report-box p {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+    flex-grow: 1; /* Pushes status to the bottom */
+}
+
+.pass { border-color: #34d399; background-color: #164e3b; color: #a7f3d0; }
+.fail { border-color: #f87171; background-color: #7f1d1d; color: #fecaca; }
+.incompatible { border-color: #64748b; background-color: #334155; color: #94a3b8; }
+.ai-pass { border-color: #818cf8; background-color: #312e81; color: #a5b4fc; }
+
+
+.static-report hr {
+    margin-top: 2rem;
+    border-color: #334155;
+}
+
+.finding-card {
+    background-color: #334155;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.file-report {
+    border: 1px solid #475569;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.file-report h3 {
+    margin-top: 0;
+    color: #c7d2fe;
+}
+
+code {
+    background-color: #334155;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Loading Spinner */
+.loading-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: #94a3b8;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #4f46e5;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Risk Colors */
+.risk-high { color: #ef4444; font-weight: bold; }
+.risk-medium { color: #f97316; font-weight: bold; }
+.risk-low { color: #84cc16; font-weight: bold; }
