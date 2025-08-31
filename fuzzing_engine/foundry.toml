@@ -1,0 +1,9 @@
+[profile.default]
+src = 'src'
+test = 'test'
+libs = ['lib']
+
+# Remappings tell the compiler to use an alias for long import paths
+[remappings]
+'forge-std/' = 'lib/forge-std/src/'
+'openzeppelin/' = 'lib/openzeppelin-contracts/contracts/'
