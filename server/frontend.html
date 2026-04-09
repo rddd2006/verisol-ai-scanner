@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriSol AI Scanner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #667eea; min-height: 100vh; padding: 20px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { text-align: center; color: white; margin-bottom: 40px; }
+        header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .row { grid-template-columns: 1fr; } }
+        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        h2 { margin-bottom: 20px; color: #333; }
+        input, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; font-family: monospace; }
+        textarea { min-height: 120px; resize: vertical; }
+        button { width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold; }
+        button:hover { background: #5568d3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #eee; }
+        .tab { padding: 10px 15px; background: none; border: none; cursor: pointer; border-bottom: 3px solid transparent; }
+        .tab.active { border-bottom-color: #667eea; color: #667eea; font-weight: bold; }
+        .hidden { display: none !important; }
+        .loading { text-align: center; padding: 20px; }
+        .spinner { border: 3px solid #eee; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { background: #fee; border: 1px solid #f88; padding: 15px; border-radius: 5px; margin: 10px 0; color: #c33; }
+        .success { background: #efe; border: 1px solid #8f8; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .report { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #667eea; }
+        .report h4 { margin: 10px 0 5px; }
+        .report p { margin: 5px 0; line-height: 1.5; }
+        code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 VeriSol AI Scanner</h1>
+            <p>Smart Contract Security Analysis</p>
+        </header>
+
+        <div class="row">
+            <div class="card">
+                <h2>Input</h2>
+                <div class="tabs">
+                    <button class="tab active" onclick="setType(event, 'address')">Address</button>
+                    <button class="tab" onclick="setType(event, 'github')">GitHub</button>
+                    <button class="tab" onclick="setType(event, 'text')">Code</button>
+                </div>
+
+                <input id="input-address" type="text" placeholder="E.g., 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" />
+                <input id="input-github" type="text" placeholder="E.g., https://github.com/OpenZeppelin/openzeppelin-contracts" class="hidden" />
+                <textarea id="input-text" placeholder="Paste Solidity code here..." class="hidden"></textarea>
+
+                <button onclick="analyze()">Analyze Now</button>
+            </div>
+
+            <div class="card">
+                <h2>Results</h2>
+                <div id="results">
+                    <p style="color: #999;">Results will appear here...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let inputType = 'address';
+
+        function setType(event, type) {
+            inputType = type;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('input-address').classList.add('hidden');
+            document.getElementById('input-github').classList.add('hidden');
+            document.getElementById('input-text').classList.add('hidden');
+            document.getElementById('input-' + type).classList.remove('hidden');
+        }
+
+        function getInput() {
+            if (inputType === 'address') return document.getElementById('input-address').value.trim();
+            if (inputType === 'github') return document.getElementById('input-github').value.trim();
+            if (inputType === 'text') return document.getElementById('input-text').value.trim();
+            return '';
+        }
+
+        async function analyze() {
+            const input = getInput();
+            if (!input) {
+                showResult('<div class="error">Please provide input!</div>');
+                return;
+            }
+
+            showResult('<div class="loading"><div class="spinner"></div><p>Analyzing... (30-60 seconds)</p></div>');
+
+            try {
+                const response = await fetch('http://localhost:3001/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ inputType: inputType, input: input })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showResult(`<div class="error"><b>Error:</b> ${data.error || 'Unknown error'}</div>`);
+                    return;
+                }
+
+                displayReport(data);
+            } catch (e) {
+                showResult(`<div class="error"><b>Connection Error:</b> ${e.message}</div>`);
+            }
+        }
+
+        function showResult(html) {
+            document.getElementById('results').innerHTML = html;
+        }
+
+        function displayReport(data) {
+            let html = '';
+
+            if (data.reportType === 'address') {
+                html = `
+                    <div class="report">
+                        <h4>📋 Address Analysis</h4>
+                        <p><code>${data.address}</code></p>
+                    </div>
+                    ${renderSection('Honeypot Check', data.dynamicAnalysis)}
+                    ${renderSection('Generic Fuzzing', data.genericFuzzing)}
+                    ${renderSection('AI Fuzzing', data.aiFuzzing)}
+                    ${renderSection('Static Analysis', data.staticAnalysis)}
+                `;
+            } else {
+                html = `
+                    <div class="report">
+                        <h4>${data.reportType === 'repo' ? '📚' : '💻'} ${data.reportType === 'repo' ? 'Repository' : 'Code'} Analysis</h4>
+                        <p>${data.repository || data.filesAnalyzed ? `Files: ${data.filesAnalyzed || 1}` : ''}</p>
+                    </div>
+                    ${(data.files || []).map(f => `
+                        <div class="report">
+                            <h4>📄 ${f.file}</h4>
+                            ${renderAnalysis(f.analysis)}
+                        </div>
+                    `).join('')}
+                `;
+            }
+
+            showResult(html);
+        }
+
+        function renderSection(title, data) {
+            if (!data) return '';
+            return `<div class="report"><h4>${title}</h4>${renderAnalysis(data)}</div>`;
+        }
+
+        function renderAnalysis(data) {
+            if (!data) return '<p>No data</p>';
+            
+            if (data.error) return `<p style="color:#c33;">${data.error}</p>`;
+            if (data.source === 'skipped') return `<p>${data.reason}</p>`;
+            if (data.isHoneypot !== undefined) {
+                let icon = data.isHoneypot ? '🚨' : '✅';
+                return `<p>${icon} ${data.reason}</p>`;
+            }
+            if (data.status) {
+                let icon = data.status === 'passed' ? '✅' : data.status === 'failed' ? '❌' : '⚠️';
+                let text = data.reason || data.log || data.interpretation || data.status;
+                return `<p>${icon} ${text}</p>`;
+            }
+            if (data.riskScore) {
+                return `
+                    <p><b>Risk:</b> <span style="background:#667eea;color:white;padding:2px 8px;border-radius:3px;">${data.riskScore}</span></p>
+                    <p><b>Summary:</b> ${data.summary}</p>
+                    ${data.findings ? `<p><b>Findings:</b> ${data.findings.length}</p>` : ''}
+                `;
+            }
+            return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+    </script>
+</body>
+</html>

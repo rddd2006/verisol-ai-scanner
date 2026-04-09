@@ -141,10 +141,18 @@ function App() {
             const response = await axios.post('http://localhost:3001/analyze', {
                 inputType: inputType,
                 input: inputValue,
+            }, {
+                timeout: 180000 // 3 minutes - analysis can take time
             });
             setResult(response.data);
         } catch (err) {
-            setError(err.response?.data?.error || 'An unexpected error occurred.');
+            if (err.code === 'ECONNABORTED') {
+                setError('Analysis timed out. This can happen for complex contracts. Please try again.');
+            } else if (err.response?.status === 0 || err.message === 'Network Error') {
+                setError('Cannot connect to server. Make sure the server is running on localhost:3001');
+            } else {
+                setError(err.response?.data?.error || err.message || 'An unexpected error occurred.');
+            }
         } finally {
             setIsLoading(false);
         }

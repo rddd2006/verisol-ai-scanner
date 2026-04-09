@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VeriSol Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        .card { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; max-width: 800px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; font-family: monospace; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #5568d3; }
+        #result { margin-top: 20px; background: #f9f9f9; padding: 15px; border: 1px solid #ddd; border-radius: 5px; white-space: pre-wrap; font-family: monospace; max-height: 500px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🤖 VeriSol AI Scanner - TEST</h1>
+        <p>Simple test version</p>
+        
+        <input type="text" id="addr" value="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" placeholder="Ethereum address">
+        <button onclick="test()">Test Analysis</button>
+        
+        <div id="result">Results will appear here...</div>
+    </div>
+
+    <script>
+        function test() {
+            document.getElementById('result').innerHTML = 'Loading...';
+            
+            const address = document.getElementById('addr').value.trim();
+            if (!address) {
+                document.getElementById('result').innerHTML = 'ERROR: No address entered';
+                return;
+            }
+            
+            fetch('http://localhost:3001/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ inputType: 'address', input: address })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+            })
+            .catch(e => {
+                document.getElementById('result').innerHTML = 'ERROR: ' + e.message;
+            });
+        }
+    </script>
+</body>
+</html>
