@@ -1,0 +1,32 @@
+{
+  "name": "verisol-backend",
+  "version": "1.0.0",
+  "description": "VeriSol AI backend — multi-agent smart contract security scanner",
+  "main": "server.js",
+  "scripts": {
+    "start":            "node server.js",
+    "dev":              "nodemon server.js",
+    "check-env":        "node check-env.js",
+    "test":             "jest --testPathPattern=tests/ --forceExit",
+    "test:unit":        "jest --testPathPattern=tests/agents --forceExit",
+    "test:contracts":   "jest --testPathPattern=tests/contracts --forceExit",
+    "test:integration": "jest --testPathPattern=tests/integration --forceExit --testTimeout=120000",
+    "test:debug":       "jest --testPathPattern=tests/ --verbose --forceExit --testTimeout=180000",
+    "test:watch":       "jest --watch --testPathPattern=tests/agents"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "axios":                 "^1.7.7",
+    "cors":                  "^2.8.5",
+    "dotenv":                "^16.4.5",
+    "express":               "^4.19.2",
+    "fs-extra":              "^11.2.0",
+    "simple-git":            "^3.26.0",
+    "viem":                  "^2.21.0"
+  },
+  "devDependencies": {
+    "jest":    "^29.7.0",
+    "nodemon": "^3.1.7"
+  },
+  "engines": { "node": ">=18.0.0" }
+}

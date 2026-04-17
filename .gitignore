@@ -1,0 +1,13 @@
+node_modules/
+.env
+dist/
+.DS_Store
+*.log
+/tmp/
+/fuzz/out/
+/fuzz/cache/
+/fuzz/lib/
+coverage/
+.nyc_output/
+*.swp
+.env
