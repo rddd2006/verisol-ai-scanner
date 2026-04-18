@@ -38,8 +38,13 @@ jest.mock("../utils/foundryRunner", () => ({
   runForgeTest: jest.fn(),
 }));
 
+jest.mock("axios", () => ({
+  get: jest.fn(),
+}));
+
 const { generate, generateJSON } = require("../utils/geminiClient");
 const { runForgeTest }           = require("../utils/foundryRunner");
+const axios                      = require("axios");
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -458,6 +463,12 @@ describe("genericFuzz module", () => {
 
 describe("fetchSource", () => {
   const { fetchSource } = require("../utils/fetchSource");
+  const originalEtherscanKey = process.env.ETHERSCAN_API_KEY;
+
+  afterEach(() => {
+    if (originalEtherscanKey) process.env.ETHERSCAN_API_KEY = originalEtherscanKey;
+    else delete process.env.ETHERSCAN_API_KEY;
+  });
 
   it("returns source as-is for inputType=code", async () => {
     const src = "pragma solidity ^0.8.0; contract X {}";
@@ -473,5 +484,37 @@ describe("fetchSource", () => {
   it("extracts contract name from source", async () => {
     const result = await fetchSource("code", "contract MyToken { }");
     expect(result.name).toBe("MyToken");
+  });
+
+  it("uses Etherscan API V2 with Sepolia chain ID for address source", async () => {
+    process.env.ETHERSCAN_API_KEY = "test-key";
+    axios.get.mockResolvedValueOnce({
+      data: {
+        status: "1",
+        message: "OK",
+        result: [
+          {
+            SourceCode: "pragma solidity ^0.8.0; contract AddressDemo {}",
+            ContractName: "AddressDemo",
+          },
+        ],
+      },
+    });
+
+    const result = await fetchSource("address", "0x0000000000000000000000000000000000000001");
+
+    expect(result.name).toBe("AddressDemo");
+    expect(axios.get).toHaveBeenCalledWith(
+      "https://api.etherscan.io/v2/api",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          chainid: "11155111",
+          module: "contract",
+          action: "getsourcecode",
+          address: "0x0000000000000000000000000000000000000001",
+          apikey: "test-key",
+        }),
+      })
+    );
   });
 });

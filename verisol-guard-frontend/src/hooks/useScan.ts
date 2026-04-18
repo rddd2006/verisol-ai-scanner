@@ -11,6 +11,19 @@ export interface AnalysisReport {
   success?: boolean;
   contractName?: string;
   sourceCode?: string;
+  inputType?: "code" | "address" | "github";
+  address?: string;
+  linesOfCode?: number;
+  files?: Array<{
+    path: string;
+    name?: string;
+    content?: string;
+    size: number;
+    isMainContract?: boolean;
+    contractNames?: string[];
+  }>;
+  fileCount?: number;
+  totalSize?: number;
   findings?: Array<{
     agent: string;
     severity: string;
@@ -35,6 +48,7 @@ export function useScan() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  const metadataRef = useRef<Partial<AnalysisReport>>({});
 
   const scan = useCallback((inputType: string, value: string, modules: Modules) => {
     if (!value?.trim()) {
@@ -48,6 +62,7 @@ export function useScan() {
     setError(null);
     setReport(null);
     setAgentStates({});
+    metadataRef.current = {};
 
     try {
       const encodedValue = btoa(unescape(encodeURIComponent(value)));
@@ -57,8 +72,18 @@ export function useScan() {
       const es = new EventSource(url);
       esRef.current = es;
 
-      es.addEventListener("source:resolved", () => {
-        // Contract resolved, scanning started
+      es.addEventListener("source:resolved", (e) => {
+        const data = JSON.parse(e.data);
+        // Store metadata from source resolution
+        metadataRef.current = {
+          contractName: data.contractName,
+          inputType: data.inputType,
+          address: data.address,
+          linesOfCode: data.linesOfCode,
+          files: data.files,
+          fileCount: data.fileCount,
+          totalSize: data.totalSize,
+        };
       });
 
       es.addEventListener("agent:start", (e) => {
@@ -78,7 +103,9 @@ export function useScan() {
 
       es.addEventListener("agent:complete", (e) => {
         const data = JSON.parse(e.data);
-        setReport(data.report || data);
+        // Merge metadata with report
+        const merged = { ...metadataRef.current, ...data.report, ...data };
+        setReport(merged);
         setPhase("done");
         es.close();
         esRef.current = null;
@@ -86,7 +113,9 @@ export function useScan() {
 
       es.addEventListener("report:complete", (e) => {
         const data = JSON.parse(e.data);
-        setReport(data);
+        // Merge metadata with report
+        const merged = { ...metadataRef.current, ...data };
+        setReport(merged);
         setPhase("done");
         es.close();
         esRef.current = null;

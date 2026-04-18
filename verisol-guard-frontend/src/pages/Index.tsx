@@ -1,4 +1,3 @@
-import { useState } from "react";
 import VerisolHeader from "@/components/VerisolHeader";
 import AnalysisInput from "@/components/AnalysisInput";
 import AnalysisResults from "@/components/AnalysisResults";
@@ -6,12 +5,35 @@ import FeaturesSection from "@/components/FeaturesSection";
 import { useScan } from "@/hooks/useScan";
 import type { Modules } from "@/hooks/useScan";
 
+const CONTRACT_DEMO_MODULES: Modules = {
+  static: true,
+  honeypot: true,
+  genericFuzz: true,
+  aiFuzz: true,
+};
+
+const QUICK_EXAMPLES = [
+  { id: "HoneypotVault", label: "Honeypot Vault", icon: "🚨" },
+  { id: "SafeVault", label: "Safe Vault", icon: "✅" },
+  { id: "FuzzCleanVault", label: "Fuzz Clean Vault", icon: "🧪" },
+  { id: "VulnerableBank", label: "Vulnerable Bank", icon: "⚠️" },
+  { id: "InsecureToken", label: "Insecure Token", icon: "🪙" },
+  { id: "NaiveLendingPool", label: "Naive Lending Pool", icon: "💧" },
+];
+
 const Index = () => {
   const { phase, agentStates, report, error, scan, cancel } = useScan();
-  const [progressAgents, setProgressAgents] = useState<string[]>([]);
 
   const handleAnalyze = (inputType: string, input: string, modules: Modules) => {
     scan(inputType, input, modules);
+  };
+
+  const runQuickExample = async (id: string) => {
+    const response = await fetch(`/api/contracts/${id}`);
+    const data = await response.json();
+    if (data.source) {
+      handleAnalyze("code", data.source, CONTRACT_DEMO_MODULES);
+    }
   };
 
   return (
@@ -53,11 +75,18 @@ const Index = () => {
             <div className="mt-4 brutal-box-static bg-muted p-3 brutal-rotate-pos-1">
               <p className="text-xs font-bold uppercase mb-2">🧪 EXAMPLES — CLICK TO TRY:</p>
               <div className="space-y-1">
-                <button onClick={() => handleAnalyze("address", "0x1a2B3c4D5e6F7a8B9c0D1e2F3a4B5c6D7e8F9a0B", { static: true, honeypot: true, genericFuzz: false, aiFuzz: false })} disabled={phase === "scanning"} className="block w-full text-left text-xs font-bold hover:bg-secondary px-2 py-1 border-b border-foreground/20 disabled:opacity-50">🚨 Honeypot Token</button>
-                <button onClick={() => handleAnalyze("address", "0xAaBbCcDdEeFf00112233445566778899AaBbCcDd", { static: true, honeypot: true, genericFuzz: false, aiFuzz: false })} disabled={phase === "scanning"} className="block w-full text-left text-xs font-bold hover:bg-secondary px-2 py-1 border-b border-foreground/20 disabled:opacity-50">✅ Safe DEX Router</button>
-                <button onClick={() => handleAnalyze("address", "0xD7d6215b4EF4b9B5f40baea48F41047Eb67a11D5", { static: true, honeypot: true, genericFuzz: false, aiFuzz: false })} disabled={phase === "scanning"} className="block w-full text-left text-xs font-bold hover:bg-secondary px-2 py-1 border-b border-foreground/20 disabled:opacity-50">⚠️ Unverified Vault</button>
-                <button onClick={() => handleAnalyze("github", "https://github.com/transmissions11/solmate", { static: true, honeypot: false, genericFuzz: false, aiFuzz: false })} disabled={phase === "scanning"} className="block w-full text-left text-xs font-bold hover:bg-secondary px-2 py-1 border-b border-foreground/20 disabled:opacity-50">📦 Solmate Repo</button>
-                <button onClick={() => handleAnalyze("github", "https://github.com/OpenZeppelin/openzeppelin-contracts", { static: true, honeypot: false, genericFuzz: false, aiFuzz: false })} disabled={phase === "scanning"} className="block w-full text-left text-xs font-bold hover:bg-secondary px-2 py-1 disabled:opacity-50">📦 OpenZeppelin</button>
+                {QUICK_EXAMPLES.map((example, index) => (
+                  <button
+                    key={example.id}
+                    onClick={() => runQuickExample(example.id)}
+                    disabled={phase === "scanning"}
+                    className={`block w-full text-left text-xs font-bold hover:bg-secondary px-2 py-1 disabled:opacity-50 ${
+                      index < QUICK_EXAMPLES.length - 1 ? "border-b border-foreground/20" : ""
+                    }`}
+                  >
+                    {example.icon} {example.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

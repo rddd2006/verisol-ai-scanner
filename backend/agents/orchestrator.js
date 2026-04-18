@@ -77,8 +77,12 @@ async function runOrchestrator(sourceCode, address, modules, emit) {
   emit("agent:start", { agent: "orchestrator", message: "Pipeline started" });
 
   // ── 1. Static analysis + Honeypot in PARALLEL ────────────────────────
-  emit("agent:start",    { agent: "static",   message: "Gemini static vulnerability scan started" });
-  emit("agent:start",    { agent: "honeypot", message: "Honeypot + bytecode analysis started" });
+  if (modules.static !== false) {
+    emit("agent:start", { agent: "static", message: "Gemini static vulnerability scan started" });
+  }
+  if (modules.honeypot !== false) {
+    emit("agent:start", { agent: "honeypot", message: "Honeypot + bytecode analysis started" });
+  }
 
   const [staticResult, honeypotResult] = await Promise.all([
     modules.static !== false
@@ -111,8 +115,12 @@ async function runOrchestrator(sourceCode, address, modules, emit) {
   }
 
   // ── 3. Generic fuzz + AI-driven fuzz in PARALLEL ─────────────────────
-  emit("agent:start", { agent: "genericFuzz", message: "Generic Foundry invariant suite starting..." });
-  emit("agent:start", { agent: "aiFuzz",      message: "AI-driven fuzz runner starting..." });
+  if (modules.genericFuzz !== false) {
+    emit("agent:start", { agent: "genericFuzz", message: "Generic Foundry invariant suite starting..." });
+  }
+  if (modules.aiFuzz !== false) {
+    emit("agent:start", { agent: "aiFuzz", message: "AI-driven fuzz runner starting..." });
+  }
 
   const [genericResult, aiFuzzResult] = await Promise.all([
     modules.genericFuzz !== false
@@ -137,6 +145,7 @@ async function runOrchestrator(sourceCode, address, modules, emit) {
   ];
 
   let fuzzInterp = null;
+  const fuzzWasEnabled = modules.genericFuzz !== false || modules.aiFuzz !== false;
   if (allFuzzTests.some((t) => t.status === "fail")) {
     emit("agent:start", { agent: "fuzzInterp", message: "Interpreter agent explaining fuzz failures..." });
     try {
@@ -145,7 +154,7 @@ async function runOrchestrator(sourceCode, address, modules, emit) {
     } catch (e) {
       handleErr("fuzzInterp", e, report, emit);
     }
-  } else {
+  } else if (fuzzWasEnabled) {
     emit("agent:done", {
       agent: "fuzzInterp",
       result: { interpretations: [], overallFuzzSeverity: "none", newFindingsVsStatic: "No fuzz failures to interpret." },

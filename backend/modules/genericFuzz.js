@@ -42,7 +42,7 @@ function detectConstructorArgs(source) {
   const encodeCall = `abi.encode(${defaults.join(", ")})`;
   return {
     encodedArgs: encodeCall,
-    deployNote:  `// Constructor args: ${types.join(", ")} → ${defaults.join(", ")}`,
+    deployNote:  `// Constructor args: ${types.join(", ")} -> ${defaults.join(", ")}`,
   };
 }
 
@@ -102,7 +102,7 @@ function buildGenericTestSuite(contractName, pragma, source) {
         assertEq(
             tsBefore,
             tsAfter,
-            "INVARIANT: totalSupply changed after transfer — hidden fee or burn"
+            "INVARIANT: totalSupply changed after transfer - hidden fee or burn"
         );
     }
 
@@ -110,8 +110,12 @@ function buildGenericTestSuite(contractName, pragma, source) {
     //  TOKEN TEST 2: transferFrom without approve must fail
     // ─────────────────────────────────────────────────────────────────
     function testFuzz_transferFromRequiresApproval(address from, address to, uint96 amount) public {
-        vm.assume(from != address(0) && to != address(0) && from != to);
-        vm.assume(amount > 0);
+        vm.assume(from != address(0) && to != address(0) && from != to && from != address(this));
+        vm.assume(amount > 0 && amount <= 1e21);
+
+        // Seed the from address when this contract owns supply. This makes the
+        // allowance invariant exercise real balances instead of mostly skipping.
+        target.call(abi.encodeWithSignature("transfer(address,uint256)", from, uint256(amount)));
 
         // Check allowance is zero for this test account
         (, bytes memory allowBytes) = target.staticcall(
@@ -144,11 +148,38 @@ function buildGenericTestSuite(contractName, pragma, source) {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  TOKEN TEST 3: admin burn must not exceed holder balance
+    //  TOKEN TEST 3: privileged minting must be capped or unavailable
+    // ─────────────────────────────────────────────────────────────────
+    function testFuzz_ownerMintCannotInflateSupply(address receiver, uint96 amount) public {
+        vm.assume(receiver != address(0));
+        vm.assume(amount > 0 && amount <= 1e24);
+
+        (, bytes memory supplyBeforeBytes) = target.staticcall(abi.encodeWithSignature("totalSupply()"));
+        if (supplyBeforeBytes.length < 32) return;
+        uint256 supplyBefore = abi.decode(supplyBeforeBytes, (uint256));
+
+        (bool ok,) = target.call(abi.encodeWithSignature("mint(address,uint256)", receiver, uint256(amount)));
+        if (!ok) return;
+
+        (, bytes memory supplyAfterBytes) = target.staticcall(abi.encodeWithSignature("totalSupply()"));
+        if (supplyAfterBytes.length < 32) return;
+        uint256 supplyAfter = abi.decode(supplyAfterBytes, (uint256));
+
+        assertEq(
+            supplyAfter,
+            supplyBefore,
+            "UNCAPPED_MINT: privileged mint changed totalSupply"
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  TOKEN TEST 4: admin burn must not let admin burn arbitrary holders
     // ─────────────────────────────────────────────────────────────────
     function testFuzz_adminBurnCapped(address victim, uint96 burnAmount) public {
-        vm.assume(victim != address(0));
-        vm.assume(burnAmount > 0);
+        vm.assume(victim != address(0) && victim != address(this));
+        vm.assume(burnAmount > 0 && burnAmount <= 1e21);
+
+        target.call(abi.encodeWithSignature("transfer(address,uint256)", victim, uint256(burnAmount)));
 
         (, bytes memory balBefore) = target.staticcall(
             abi.encodeWithSignature("balanceOf(address)", victim)
@@ -164,10 +195,10 @@ function buildGenericTestSuite(contractName, pragma, source) {
         if (balAfter.length < 32) return;
         uint256 balanceAfterBurn = abi.decode(balAfter, (uint256));
 
-        assertLe(
+        assertEq(
             balanceAfterBurn,
             balanceBeforeBurn,
-            "BURN: balance increased after burn — impossible"
+            "CENTRALIZED_BURN: adminBurn changed another holder balance"
         );
     }
 ` : "";
@@ -211,6 +242,38 @@ function buildGenericTestSuite(contractName, pragma, source) {
             abi.encodeWithSignature("borrow(uint256)", uint256(borrowAmount))
         );
         assertFalse(ok, "UNDERCOLLATERAL: borrow succeeded with zero collateral");
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  LENDING TEST 3: third parties must not clear another account debt
+    // ─────────────────────────────────────────────────────────────────
+    function testFuzz_repayRequiresBorrower(uint96 borrowAmount) public {
+        vm.assume(borrowAmount > 0 && borrowAmount <= 1000);
+
+        target.call{value: 10 ether}(abi.encodeWithSignature("addLiquidity(uint256)", uint256(1_000_000)));
+
+        address borrower = address(0xB0B);
+        vm.deal(borrower, 10 ether);
+        vm.prank(borrower);
+        target.call{value: 1 ether}(abi.encodeWithSignature("depositCollateral()"));
+        vm.prank(borrower);
+        (bool borrowOk,) = target.call(abi.encodeWithSignature("borrow(uint256)", uint256(borrowAmount)));
+        if (!borrowOk) return;
+
+        (, bytes memory debtBeforeBytes) = target.staticcall(abi.encodeWithSignature("borrowed(address)", borrower));
+        if (debtBeforeBytes.length < 32) return;
+        uint256 debtBefore = abi.decode(debtBeforeBytes, (uint256));
+        if (debtBefore == 0) return;
+
+        address attackerRepayer = address(0xA77A);
+        vm.prank(attackerRepayer);
+        target.call(abi.encodeWithSignature("repay(address,uint256)", borrower, uint256(borrowAmount)));
+
+        (, bytes memory debtAfterBytes) = target.staticcall(abi.encodeWithSignature("borrowed(address)", borrower));
+        if (debtAfterBytes.length < 32) return;
+        uint256 debtAfter = abi.decode(debtAfterBytes, (uint256));
+
+        assertEq(debtAfter, debtBefore, "REPAY_AUTH: third party changed borrower debt");
     }
 ` : "";
 
@@ -389,7 +452,7 @@ contract GenericFuzzTest is Test {
         assertGe(
             target.balance,
             recorded,
-            "SOLVENCY: contract ETH < recorded user balance — protocol insolvent"
+            "SOLVENCY: contract ETH < recorded user balance - protocol insolvent"
         );
     }
 

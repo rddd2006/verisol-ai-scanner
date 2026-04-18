@@ -12,7 +12,7 @@ Complete technical documentation for VeriSol AI.
 | **Frontend (Vite)** | `5173` | `http://localhost:5173` |
 | **Vite → backend proxy** | auto | `/api/*` proxied to `3001` |
 
-> **Lovable users:** point your API calls to `http://localhost:3001`. The Vite proxy is not available in Lovable — use the full URL.
+> Point your API calls to `http://localhost:3001`.
 
 ---
 
@@ -332,7 +332,7 @@ All agents use **`gemini-1.5-pro`** via `@google/generative-ai`.
 app.use(cors({ origin: "http://localhost:5173" }));
 ```
 
-For production or Lovable, update `origin` to your frontend URL.
+For production environments, update the `origin` to your frontend URL.
 
 ---
 

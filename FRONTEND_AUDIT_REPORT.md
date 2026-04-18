@@ -8,7 +8,7 @@
 
 ## Summary
 
-The frontend was built with excellent UX (Lovable-generated, shadcn/ui, TypeScript) but uses **wrong API endpoints** that don't exist in the backend. It will fail to connect.
+The frontend was built with excellent UX (React + shadcn/ui + TypeScript) but uses **wrong API endpoints** that don't exist in the backend. It will fail to connect.
 
 ---
 
@@ -20,7 +20,7 @@ The frontend was built with excellent UX (Lovable-generated, shadcn/ui, TypeScri
 | UI Framework | ✅ Professional | shadcn/ui + Radix UI |
 | Styling | ✅ Polished | Custom "brutal" design system |
 | Port | ⚠️ Non-standard | Runs on 8080 (not 5173) |
-| Build | ✅ Optimized | Vite with SWC, Lovable-aware |
+| Build | ✅ Optimized | Vite with SWC |
 | Dependencies | ✅ Installed | 496 packages, 18 vulnerabilities (low risk) |
 
 ---
@@ -274,7 +274,7 @@ Just fix the API calls to match backend:
 5. Test
 
 ### Option B: Rebuild from scratch (6-8 hours)
-Use Lovable/LLM to regenerate with correct spec:
+Use an AI code generator or manual setup to create with correct spec:
 1. Describe backend API properly
 2. Explain SSE needs
 3. Request module toggles

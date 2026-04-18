@@ -66,7 +66,7 @@ function staticHeuristics(src) {
 
 // ── Load all fixture contracts ────────────────────────────────────────────────
 
-const FIXTURES = ["VulnerableBank", "InsecureToken", "HoneypotVault", "SafeVault", "NaiveLendingPool"]
+const FIXTURES = ["VulnerableBank", "InsecureToken", "HoneypotVault", "SafeVault", "FuzzCleanVault", "NaiveLendingPool"]
   .map((name) => ({
     name,
     source: fs.readFileSync(path.join(__dirname, `fixtures/${name}.sol`), "utf8"),
@@ -75,13 +75,14 @@ const FIXTURES = ["VulnerableBank", "InsecureToken", "HoneypotVault", "SafeVault
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Contract registry (contracts/index.js)", () => {
-  it("exports all 5 pre-built contracts", () => {
+  it("exports all 6 pre-built contracts", () => {
     const { CONTRACTS } = require(path.join(__dirname, "../../contracts/index.js"));
-    expect(Object.keys(CONTRACTS)).toHaveLength(5);
+    expect(Object.keys(CONTRACTS)).toHaveLength(6);
     expect(CONTRACTS).toHaveProperty("VulnerableBank");
     expect(CONTRACTS).toHaveProperty("InsecureToken");
     expect(CONTRACTS).toHaveProperty("HoneypotVault");
     expect(CONTRACTS).toHaveProperty("SafeVault");
+    expect(CONTRACTS).toHaveProperty("FuzzCleanVault");
     expect(CONTRACTS).toHaveProperty("NaiveLendingPool");
   });
 
@@ -205,6 +206,33 @@ describe("SafeVault", () => {
 
   it("uses pragma ^0.8.20", () => {
     expect(extractPragma(source)).toBe("^0.8.20");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("FuzzCleanVault", () => {
+  const { source } = FIXTURES.find((f) => f.name === "FuzzCleanVault");
+
+  it("extracts correct contract name", () => {
+    expect(extractContractName(source)).toBe("FuzzCleanVault");
+  });
+
+  it("is detected as vault type", () => {
+    expect(detectContractType(source)).toBe("vault");
+  });
+
+  it("has no constructor args", () => {
+    expect(detectConstructorArgs(source).hasArgs).toBe(false);
+  });
+
+  it("static heuristics: no risky fuzz fallback signals", () => {
+    const h = staticHeuristics(source);
+    expect(h.reentrancy).toBe(false);
+    expect(h.txOrigin).toBe(false);
+    expect(h.selfDestruct).toBe(false);
+    expect(h.unchecked).toBe(false);
+    expect(h.flashLoan).toBe(false);
   });
 });
 

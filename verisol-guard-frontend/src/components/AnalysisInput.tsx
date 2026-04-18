@@ -29,22 +29,37 @@ const CONTRACT_EMOJI = {
   InsecureToken: "🪙",
   HoneypotVault: "🍯",
   SafeVault: "🔒",
+  FuzzCleanVault: "🧪",
   NaiveLendingPool: "💧",
 };
 
 const SEVERITY_COLORS = {
-  critical: "border-red-700/40 bg-red-900/10 hover:bg-red-900/20",
-  high: "border-orange-700/40 bg-orange-900/10 hover:bg-orange-900/20",
-  none: "border-green-700/40 bg-green-900/10 hover:bg-green-900/20",
+  critical: "border-red-400 bg-red-950/80 hover:bg-red-900/60 shadow-[5px_5px_0_0_rgba(248,113,113,0.55)]",
+  high: "border-yellow-300 bg-yellow-950/80 hover:bg-yellow-900/60 shadow-[5px_5px_0_0_rgba(253,224,71,0.55)]",
+  none: "border-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/60 shadow-[5px_5px_0_0_rgba(110,231,183,0.55)]",
 };
 
 const SEVERITY_BADGE = {
-  critical: "bg-red-900/40 text-red-300 border border-red-700/40 text-xs font-bold px-2 py-1 rounded",
-  high: "bg-orange-900/40 text-orange-300 border border-orange-700/40 text-xs font-bold px-2 py-1 rounded",
-  none: "bg-green-900/40 text-green-300 border border-green-700/40 text-xs font-bold px-2 py-1 rounded",
+  critical: "bg-red-950 text-red-100 border border-red-300 text-xs font-bold px-2 py-1 rounded",
+  high: "bg-yellow-950 text-yellow-100 border border-yellow-300 text-xs font-bold px-2 py-1 rounded",
+  none: "bg-emerald-950 text-emerald-100 border border-emerald-300 text-xs font-bold px-2 py-1 rounded",
 };
 
-const AnalysisInput = ({ onAnalyze, isLoading }: AnalysisInputProps) => {
+const DEMO_CONTRACT_MODULES: Modules = {
+  static: true,
+  honeypot: true,
+  genericFuzz: true,
+  aiFuzz: true,
+};
+
+const GENERIC_FUZZ_DEMO_MODULES: Modules = {
+  static: false,
+  honeypot: false,
+  genericFuzz: true,
+  aiFuzz: false,
+};
+
+const AnalysisInput = ({ onAnalyze, isLoading: isScanning }: AnalysisInputProps) => {
   const [activeTab, setActiveTab] = useState<InputType>("address");
   const [input, setInput] = useState("");
   const [modules, setModules] = useState<Modules>({
@@ -92,6 +107,12 @@ const AnalysisInput = ({ onAnalyze, isLoading }: AnalysisInputProps) => {
             severity: "none",
           },
           {
+            id: "FuzzCleanVault",
+            label: "Fuzz Clean Vault",
+            description: "Minimal safe vault with clean fuzz pass surface",
+            severity: "none",
+          },
+          {
             id: "NaiveLendingPool",
             label: "Naive Lending Pool",
             description: "Flash loan oracle manipulation + free flash loans",
@@ -112,6 +133,26 @@ const AnalysisInput = ({ onAnalyze, isLoading }: AnalysisInputProps) => {
         setInput(data.source);
         setActiveTab("code");
         setActiveId(id);
+        setModules(DEMO_CONTRACT_MODULES);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const runGenericFuzzContract = async (id: string) => {
+    setLoadingId(id);
+    try {
+      const response = await fetch(`/api/contracts/${id}`);
+      const data = await response.json();
+      if (data.source) {
+        setInput(data.source);
+        setActiveTab("code");
+        setActiveId(id);
+        setModules(GENERIC_FUZZ_DEMO_MODULES);
+        onAnalyze("code", data.source, GENERIC_FUZZ_DEMO_MODULES);
       }
     } catch {
       // Silently fail
@@ -181,7 +222,7 @@ const AnalysisInput = ({ onAnalyze, isLoading }: AnalysisInputProps) => {
                     type="checkbox"
                     checked={value}
                     onChange={(e) => setModules({ ...modules, [key]: e.target.checked })}
-                    disabled={isLoading}
+                    disabled={isScanning}
                     className="cursor-pointer"
                   />
                   <span className="text-sm font-bold uppercase">{key}</span>
@@ -192,10 +233,10 @@ const AnalysisInput = ({ onAnalyze, isLoading }: AnalysisInputProps) => {
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading || !input.trim()}
+            disabled={isScanning || !input.trim()}
             className="mt-4 w-full brutal-box bg-primary text-primary-foreground px-6 py-4 text-lg font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-secondary hover:text-secondary-foreground active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
           >
-            {isLoading ? (
+            {isScanning ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="inline-block animate-spin">⚙️</span> ANALYZING...
               </span>
@@ -209,50 +250,63 @@ const AnalysisInput = ({ onAnalyze, isLoading }: AnalysisInputProps) => {
       {/* Pre-built Example Contracts */}
       <div>
         <p className="text-xs font-bold uppercase mb-3 text-gray-300">
-          📦 PRE-BUILT EXAMPLE CONTRACTS (click to load)
+          📦 PRE-BUILT EXAMPLE CONTRACTS (loads with fuzzing enabled)
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {contracts.map((contract) => {
             const emoji = CONTRACT_EMOJI[contract.id as keyof typeof CONTRACT_EMOJI] || "📄";
             const colorClass = SEVERITY_COLORS[contract.severity];
-            const isLoading = loadingId === contract.id;
+            const isContractLoading = loadingId === contract.id;
             const isActive = activeId === contract.id;
 
             return (
-              <button
+              <div
                 key={contract.id}
-                onClick={() => loadContract(contract.id)}
-                disabled={isLoading || isLoading}
                 className={`
-                  relative text-left p-3.5 rounded-xl border transition-all duration-150 cursor-pointer
+                  relative text-left p-3.5 rounded-none border-[3px] transition-all duration-150 cursor-pointer
                   ${
                     isActive
-                      ? "ring-2 ring-blue-500/50 border-blue-500/50 bg-blue-900/10"
+                      ? "ring-2 ring-cyan-300 border-cyan-300 bg-cyan-950/40 shadow-[5px_5px_0_0_rgba(103,232,249,0.55)]"
                       : colorClass
                   }
-                  disabled:opacity-60 disabled:cursor-wait
+                  disabled:opacity-60 disabled:cursor-wait hover:-translate-x-0.5 hover:-translate-y-0.5
                 `}
               >
-                {/* Header row */}
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-lg leading-none">{emoji}</span>
-                  <span className="text-sm font-semibold text-gray-100 leading-snug flex-1">
+                <button
+                  type="button"
+                  onClick={() => loadContract(contract.id)}
+                  disabled={isScanning || isContractLoading}
+                  className="block w-full text-left disabled:cursor-wait"
+                >
+                  {/* Header row */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                  <span className="grid h-8 w-8 place-items-center border-[2px] border-current bg-background text-lg leading-none shadow-[2px_2px_0_0_currentColor]">{emoji}</span>
+                  <span className="text-sm font-black uppercase text-white leading-snug flex-1">
                     {contract.label}
                   </span>
-                  {isLoading && <Loader2 size={14} className="text-blue-400 animate-spin" />}
-                  {isActive && !isLoading && (
+                  {isContractLoading && <Loader2 size={14} className="text-blue-400 animate-spin" />}
+                  {isActive && !isContractLoading && (
                     <span className="text-xs text-blue-400 font-mono">loaded</span>
                   )}
-                </div>
-                {/* Description */}
-                <p className="text-xs text-gray-400 leading-snug mb-2">{contract.description}</p>
-                {/* Severity Badge */}
-                <div className="flex items-center gap-1.5">
-                  <span className={SEVERITY_BADGE[contract.severity]}>
-                    {contract.severity === "none" ? "safe" : contract.severity}
-                  </span>
-                </div>
-              </button>
+                  </div>
+                  {/* Description */}
+                  <p className="text-xs text-gray-100 leading-snug mb-2">{contract.description}</p>
+                  {/* Severity Badge */}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`${SEVERITY_BADGE[contract.severity]} rounded-none uppercase`}>
+                      {contract.severity === "none" ? "safe" : contract.severity}
+                    </span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runGenericFuzzContract(contract.id)}
+                  disabled={isScanning || isContractLoading}
+                  className="mt-3 w-full rounded-none border-[2px] border-cyan-300 bg-background px-2 py-1.5 text-xs font-black uppercase text-cyan-200 shadow-[3px_3px_0_0_rgba(103,232,249,0.75)] hover:bg-cyan-950/50 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-60 disabled:cursor-wait"
+                >
+                  Run Generic Fuzz
+                </button>
+              </div>
             );
           })}
         </div>

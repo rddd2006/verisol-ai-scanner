@@ -14,14 +14,16 @@ const CONTRACT_META = {
   InsecureToken:    { icon: Coins,       color: "orange", emoji: "🪙" },
   HoneypotVault:    { icon: ShieldAlert, color: "red",    emoji: "🍯" },
   SafeVault:        { icon: Shield,      color: "green",  emoji: "🔒" },
+  FuzzCleanVault:   { icon: Zap,         color: "cyan",   emoji: "🧪" },
   NaiveLendingPool: { icon: FlaskConical,color: "purple", emoji: "💧" },
 };
 
 const COLOR = {
-  red:    { card: "border-red-700/40 bg-red-900/10 hover:bg-red-900/20",    badge: "bg-red-900/40 text-red-300 border-red-700/40",    icon: "text-red-400"    },
-  orange: { card: "border-orange-700/40 bg-orange-900/10 hover:bg-orange-900/20", badge: "bg-orange-900/40 text-orange-300 border-orange-700/40", icon: "text-orange-400" },
-  green:  { card: "border-green-700/40 bg-green-900/10 hover:bg-green-900/20",   badge: "bg-green-900/40 text-green-300 border-green-700/40",   icon: "text-green-400"  },
-  purple: { card: "border-purple-700/40 bg-purple-900/10 hover:bg-purple-900/20", badge: "bg-purple-900/40 text-purple-300 border-purple-700/40", icon: "text-purple-400" },
+  red:    { card: "border-red-400 bg-red-950/80 hover:bg-red-900/60 shadow-[5px_5px_0_0_rgba(248,113,113,0.55)]", badge: "bg-red-950 text-red-100 border-red-300", icon: "text-red-200" },
+  orange: { card: "border-yellow-300 bg-yellow-950/80 hover:bg-yellow-900/60 shadow-[5px_5px_0_0_rgba(253,224,71,0.55)]", badge: "bg-yellow-950 text-yellow-100 border-yellow-300", icon: "text-yellow-100" },
+  green:  { card: "border-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/60 shadow-[5px_5px_0_0_rgba(110,231,183,0.55)]", badge: "bg-emerald-950 text-emerald-100 border-emerald-300", icon: "text-emerald-100" },
+  cyan:   { card: "border-cyan-200 bg-cyan-950/80 hover:bg-cyan-900/60 shadow-[5px_5px_0_0_rgba(165,243,252,0.60)]", badge: "bg-cyan-950 text-cyan-50 border-cyan-200", icon: "text-cyan-50" },
+  purple: { card: "border-fuchsia-300 bg-fuchsia-950/80 hover:bg-fuchsia-900/60 shadow-[5px_5px_0_0_rgba(240,171,252,0.55)]", badge: "bg-fuchsia-950 text-fuchsia-100 border-fuchsia-300", icon: "text-fuchsia-100" },
 };
 
 const SEV_BADGE = {
@@ -35,6 +37,20 @@ const TABS = [
   { id: "address", icon: Hash,   label: "Sepolia Address"  },
   { id: "github",  icon: Github, label: "GitHub Repo"      },
 ];
+
+const DEMO_CONTRACT_MODULES = {
+  static:      true,
+  honeypot:    true,
+  genericFuzz: true,
+  aiFuzz:      true,
+};
+
+const GENERIC_FUZZ_DEMO_MODULES = {
+  static:      false,
+  honeypot:    false,
+  genericFuzz: true,
+  aiFuzz:      false,
+};
 
 export default function InputPanel({
   inputType, setInputType,
@@ -59,6 +75,7 @@ export default function InputPanel({
           { id: "InsecureToken",    label: "Insecure Token",         description: "Uncapped mint + no allowance check",             severity: "high"     },
           { id: "HoneypotVault",    label: "Honeypot Vault",         description: "selfdestruct trap + owner-only withdraw",         severity: "critical" },
           { id: "SafeVault",        label: "Safe Vault ✓",           description: "Well-written vault — CEI + nonReentrant",         severity: "none"     },
+          { id: "FuzzCleanVault",   label: "Fuzz Clean Vault",       description: "Minimal safe vault with clean fuzz pass surface",  severity: "none"     },
           { id: "NaiveLendingPool", label: "Naive Lending Pool",     description: "Flash loan oracle manipulation + free flash loans",severity: "critical" },
         ]);
       });
@@ -74,6 +91,26 @@ export default function InputPanel({
         setValue(data.source);
         setInputType("code");
         setActiveId(id);
+        setModules(DEMO_CONTRACT_MODULES);
+      }
+    } catch {
+      // Silently fall back to empty (error shown in scan phase)
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const runGenericFuzzContract = async (id) => {
+    setLoadingId(id);
+    try {
+      const r    = await fetch(`${API_BASE}/api/contracts/${id}`);
+      const data = await r.json();
+      if (data.source) {
+        setValue(data.source);
+        setInputType("code");
+        setActiveId(id);
+        setModules(GENERIC_FUZZ_DEMO_MODULES);
+        onScan({ inputType: "code", value: data.source, modules: GENERIC_FUZZ_DEMO_MODULES });
       }
     } catch {
       // Silently fall back to empty (error shown in scan phase)
@@ -104,7 +141,7 @@ export default function InputPanel({
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
           <Zap size={12} className="text-yellow-400" />
           Pre-built Example Contracts
-          <span className="text-gray-600 normal-case font-normal tracking-normal">(click to load)</span>
+          <span className="text-gray-600 normal-case font-normal tracking-normal">(loads with generic + AI fuzz)</span>
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {contracts.map((c) => {
@@ -114,52 +151,65 @@ export default function InputPanel({
             const isActive  = activeId  === c.id;
 
             return (
-              <button
+              <div
                 key={c.id}
-                onClick={() => loadContract(c.id)}
-                disabled={isLoading}
                 className={`
-                  relative text-left p-3.5 rounded-xl border transition-all duration-150 cursor-pointer
+                  relative text-left p-3.5 rounded-none border-[3px] transition-all duration-150 cursor-pointer
                   ${isActive
-                    ? "ring-2 ring-blue-500/50 border-blue-500/50 bg-blue-900/10"
+                    ? "ring-2 ring-cyan-300 border-cyan-300 bg-cyan-950/40 shadow-[5px_5px_0_0_rgba(103,232,249,0.55)]"
                     : colors.card
                   }
-                  disabled:opacity-60 disabled:cursor-wait
+                  disabled:opacity-60 disabled:cursor-wait hover:-translate-x-0.5 hover:-translate-y-0.5
                 `}
               >
-                {/* Header row */}
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-lg leading-none">{meta.emoji}</span>
-                  <span className="text-sm font-semibold text-gray-100 leading-snug">{c.label}</span>
-                  {isLoading && <Loader2 size={12} className="ml-auto text-blue-400 animate-spin" />}
-                  {isActive  && !isLoading && (
-                    <span className="ml-auto text-xs text-blue-400 font-mono">loaded</span>
-                  )}
-                </div>
-                {/* Description */}
-                <p className="text-xs text-gray-500 leading-snug mb-2">{c.description}</p>
-                {/* Tags */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {c.severity && c.severity !== "none" && (
-                    <span className={`${SEV_BADGE[c.severity] || "badge-informational"} text-xs`}>
-                      {c.severity}
-                    </span>
-                  )}
-                  {c.severity === "none" && (
-                    <span className="badge-pass text-xs">safe</span>
-                  )}
-                  {(c.tags || []).slice(0, 2).map((t) => (
-                    <span key={t} className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-md border border-gray-700">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => loadContract(c.id)}
+                  disabled={isLoading}
+                  className="block w-full text-left disabled:cursor-wait"
+                >
+                  {/* Header row */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="grid h-8 w-8 place-items-center border-2 border-current bg-gray-950 text-lg leading-none shadow-[2px_2px_0_0_currentColor]">{meta.emoji}</span>
+                    <span className="text-sm font-black uppercase text-white leading-snug">{c.label}</span>
+                    {isLoading && <Loader2 size={12} className="ml-auto text-blue-400 animate-spin" />}
+                    {isActive  && !isLoading && (
+                      <span className="ml-auto text-xs text-blue-400 font-mono">loaded</span>
+                    )}
+                  </div>
+                  {/* Description */}
+                  <p className="text-xs text-gray-100 leading-snug mb-2">{c.description}</p>
+                  {/* Tags */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {c.severity && c.severity !== "none" && (
+                      <span className={`${SEV_BADGE[c.severity] || "badge-informational"} text-xs`}>
+                        {c.severity}
+                      </span>
+                    )}
+                    {c.severity === "none" && (
+                      <span className="badge-pass text-xs">safe</span>
+                    )}
+                    {(c.tags || []).slice(0, 2).map((t) => (
+                      <span key={t} className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-md border border-gray-700">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runGenericFuzzContract(c.id)}
+                  disabled={isLoading}
+                  className="mt-3 w-full rounded-none border-2 border-cyan-300 bg-gray-950 px-2 py-1.5 text-xs font-black uppercase text-cyan-200 shadow-[3px_3px_0_0_rgba(103,232,249,0.75)] hover:bg-cyan-950/50 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-60 disabled:cursor-wait"
+                >
+                  Run Generic Fuzz
+                </button>
+              </div>
             );
           })}
         </div>
         <p className="text-xs text-gray-600 mt-2">
-          Each example is Foundry-compatible — forge will compile and fuzz it directly.
+          Each bundled source example is Foundry-compatible and scans with generic + AI fuzz enabled.
         </p>
       </div>
 
@@ -249,7 +299,7 @@ export default function InputPanel({
         {activeId && (
           <p className="text-xs text-gray-500">
             Scanning <span className="text-blue-400 font-mono">{activeId}</span> —
-            forge will compile and fuzz this contract
+            generic + AI fuzz are enabled for this contract
           </p>
         )}
       </div>

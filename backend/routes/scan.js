@@ -42,11 +42,19 @@ router.get("/stream", async (req, res) => {
   }
 
   // Resolve source
-  let sourceCode, contractName;
+  let sourceCode, contractName, sourceMetadata = {};
   try {
     const fetched = await fetchSource(inputType, value);
     sourceCode    = fetched.source;
     contractName  = fetched.name;
+    // Preserve file metadata for GitHub repos
+    if (fetched.files) {
+      sourceMetadata = {
+        files: fetched.files,
+        fileCount: fetched.fileCount,
+        totalSize: fetched.totalSize,
+      };
+    }
   } catch (e) {
     sendSSE(res, "error", { message: `Source fetch failed: ${e.message}` });
     return res.end();
@@ -64,11 +72,29 @@ router.get("/stream", async (req, res) => {
   // Keep-alive ping every 15s so proxy doesn't close idle SSE
   const ping = setInterval(() => sendSSE(res, "ping", { ts: Date.now() }), 15_000);
 
-  sendSSE(res, "source:resolved", { contractName, linesOfCode: sourceCode.split("\n").length });
+  sendSSE(res, "source:resolved", {
+    contractName,
+    inputType,
+    linesOfCode: sourceCode.split("\n").length,
+    address,
+    ...sourceMetadata,
+  });
 
   try {
     await runOrchestrator(sourceCode, address, modules, (event, data) => {
-      sendSSE(res, event, data);
+      // Attach sourceCode to final report for address/code types
+      if (event === "agent:complete") {
+        const enrichedData = { ...data };
+        if (data.report) {
+          enrichedData.report = {
+            ...data.report,
+            sourceCode: (inputType === "address" || inputType === "code") ? sourceCode : undefined,
+          };
+        }
+        sendSSE(res, event, enrichedData);
+      } else {
+        sendSSE(res, event, data);
+      }
     });
   } catch (e) {
     sendSSE(res, "error", { message: e.message });

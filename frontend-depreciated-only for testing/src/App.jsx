@@ -12,7 +12,7 @@ export default function App() {
   const [value,     setValue]     = useState("");
   const [modules,   setModules]   = useState({ ...DEFAULT_MODULES });
 
-  const handleScan = () => scan({ inputType, value, modules });
+  const handleScan = (override) => scan(override || { inputType, value, modules });
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">

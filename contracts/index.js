@@ -42,6 +42,14 @@ const CONTRACTS = {
     severity:    "none",
     source:      fs.readFileSync(path.join(DIR, "SafeVault.sol"), "utf8"),
   },
+  FuzzCleanVault: {
+    id:          "FuzzCleanVault",
+    label:       "Fuzz Clean Vault",
+    description: "Minimal safe vault built to pass generic fuzz checks cleanly",
+    tags:        ["safe", "fuzz-pass", "vault"],
+    severity:    "none",
+    source:      fs.readFileSync(path.join(DIR, "FuzzCleanVault.sol"), "utf8"),
+  },
   NaiveLendingPool: {
     id:          "NaiveLendingPool",
     label:       "Naive Lending Pool",

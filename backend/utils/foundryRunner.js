@@ -35,6 +35,7 @@ interface Vm {
     function warp(uint256 timestamp) external;
     function roll(uint256 blockNumber) external;
     function label(address addr_, string calldata lbl) external;
+    function getCode(string calldata artifactPath) external returns (bytes memory bytecode);
     function toString(uint256 value) external pure returns (string memory);
     function toString(address value) external pure returns (string memory);
     function toString(bool value) external pure returns (string memory);
@@ -48,14 +49,8 @@ contract Test {
     event log_named_uint(string, uint256);
     event log_named_address(string, address);
 
-    bool private _failed;
-
-    modifier ifNotFailed() {
-        if (!_failed) _;
-    }
-
     function fail() internal virtual {
-        _failed = true;
+        revert("assertion failed");
     }
 
     function assertTrue(bool c) internal virtual {
@@ -108,8 +103,14 @@ contract Test {
     function assertGe(uint256 a, uint256 b) internal virtual {
         if (a < b) { emit log("assertGe: a < b"); fail(); }
     }
+    function assertGe(uint256 a, uint256 b, string memory err) internal virtual {
+        if (a < b) { emit log(err); fail(); }
+    }
     function assertLe(uint256 a, uint256 b) internal virtual {
         if (a > b) { emit log("assertLe: a > b"); fail(); }
+    }
+    function assertLe(uint256 a, uint256 b, string memory err) internal virtual {
+        if (a > b) { emit log(err); fail(); }
     }
 }
 `;

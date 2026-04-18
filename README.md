@@ -316,10 +316,6 @@ node scripts/testForge.js             # checks forge is installed + working
 
 ---
 
-## 🎨 Reproducing Frontend in Lovable
-
-See **`docs/LOVABLE.md`** for the complete Lovable integration guide including all API endpoints, types, component props, and the SSE hook.
-
 ---
 
 ## 📜 License

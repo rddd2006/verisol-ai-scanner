@@ -11,13 +11,12 @@ const scanRouter = require("./routes/scan");
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-// ── CORS — allow localhost dev + Lovable preview domains ──────────────────
+// ── CORS — allow localhost dev ───────────────────────────────────────────
 app.use(cors({
   origin: [
     "http://localhost:5173",
     "http://localhost:8080",
     "http://localhost:3000",
-    /https:\/\/.*\.lovable\.app$/,
     process.env.CORS_ORIGIN,
   ].filter(Boolean),
   methods: ["GET", "POST", "OPTIONS"],
