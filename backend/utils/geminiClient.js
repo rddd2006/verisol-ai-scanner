@@ -11,9 +11,73 @@
 const OPENROUTER_URL = "https://openrouter.io/api/v1/chat/completions";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
+// Multi-key Gemini support with automatic failover
+const GEMINI_API_KEYS = [
+  process.env.GEMINI_API_KEY_1,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+  process.env.GEMINI_API_KEY_4,
+  process.env.GEMINI_API_KEY_5,
+].filter(Boolean); // Remove undefined keys
+
+// Fallback: Single key for backward compatibility
+if (GEMINI_API_KEYS.length === 0 && process.env.GEMINI_API_KEY) {
+  GEMINI_API_KEYS.push(process.env.GEMINI_API_KEY);
+}
+
+// Track key health (when they hit rate limits)
+const keyStatus = new Map(); // key -> { lastError, errorTime, failCount }
+let currentKeyIndex = 0;
+
+function getNextValidGeminiKey() {
+  if (GEMINI_API_KEYS.length === 0) return null;
+  
+  // Find a key that hasn't failed recently (within last 60 seconds)
+  const now = Date.now();
+  for (let attempts = 0; attempts < GEMINI_API_KEYS.length; attempts++) {
+    const key = GEMINI_API_KEYS[currentKeyIndex];
+    const status = keyStatus.get(key);
+    
+    if (!status || now - status.errorTime > 60000) {
+      // Key is good or error is old enough
+      return key;
+    }
+    
+    // Try next key
+    currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+  }
+  
+  // All keys are rate limited, use the least recently failed
+  let bestKey = GEMINI_API_KEYS[0];
+  let oldestError = Infinity;
+  for (const key of GEMINI_API_KEYS) {
+    const status = keyStatus.get(key);
+    if (!status || status.errorTime < oldestError) {
+      bestKey = key;
+      oldestError = status?.errorTime || 0;
+    }
+  }
+  return bestKey;
+}
+
+function markKeyFailure(key, error) {
+  const status = keyStatus.get(key) || { failCount: 0 };
+  status.lastError = error;
+  status.errorTime = Date.now();
+  status.failCount = (status.failCount || 0) + 1;
+  keyStatus.set(key, status);
+  
+  console.warn(
+    `[Gemini] Key failed (attempt ${status.failCount}): ${error.message?.substring(0, 50)}...`
+  );
+  
+  // Move to next key for next attempt
+  currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+}
+
 // Detect which API is available and configured
 const hasOpenRouter = !!process.env.OPENAI_API_KEY;
-const hasGemini = !!process.env.GEMINI_API_KEY;
+const hasGemini = GEMINI_API_KEYS.length > 0;
 
 const MODEL      = process.env.OPENAI_MODEL      || "openai/gpt-4o-mini";
 const MODEL_FAST = process.env.OPENAI_MODEL_FAST || process.env.OPENAI_MODEL || "openai/gpt-4o-mini";
@@ -92,10 +156,9 @@ async function generateOpenRouter(prompt, { fast, maxTokens, retries }) {
 }
 
 /**
- * Generate using Google Gemini
+ * Generate using Google Gemini with multi-key failover
  */
 async function generateGemini(prompt, { fast, maxTokens, retries }) {
-  const key = process.env.GEMINI_API_KEY;
   const model = fast ? GEMINI_MODEL_FAST : GEMINI_MODEL;
 
   const body = {
@@ -112,33 +175,73 @@ async function generateGemini(prompt, { fast, maxTokens, retries }) {
   };
 
   let lastErr;
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      const url = `${GEMINI_URL}/${model}:generateContent?key=${key}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+  let keyAttempts = 0;
+  
+  // Try each key with retries
+  while (keyAttempts < GEMINI_API_KEYS.length) {
+    const key = getNextValidGeminiKey();
+    if (!key) {
+      throw new Error("No Gemini API keys available");
+    }
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(formatAPIError("Gemini", res.status, data));
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        const url = `${GEMINI_URL}/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        
+        if (!res.ok) {
+          const error = new Error(formatAPIError("Gemini", res.status, data));
+          
+          // Rate limit error? Try next key
+          if (res.status === 429) {
+            markKeyFailure(key, error);
+            keyAttempts++;
+            break; // Break inner loop, try next key
+          }
+          
+          throw error;
+        }
+
+        // Success! Reset error tracking for this key
+        const status = keyStatus.get(key);
+        if (status) {
+          status.failCount = 0;
+          status.errorTime = 0;
+        }
+
+        const text = extractGeminiText(data);
+        if (!text) throw new Error("Gemini response did not include output text");
+        return text;
+      } catch (err) {
+        lastErr = err;
+        
+        // Don't retry on rate limit with this key
+        if (err.message?.includes("429")) {
+          markKeyFailure(key, err);
+          keyAttempts++;
+          break; // Try next key
+        }
+        
+        // Retry with same key if retries remain
+        if (!isRetryableError(err) || attempt === retries) {
+          keyAttempts++;
+          break; // Try next key
+        }
+        
+        await delay(1000 * (attempt + 1));
       }
-
-      const text = extractGeminiText(data);
-      if (!text) throw new Error("Gemini response did not include output text");
-      return text;
-    } catch (err) {
-      lastErr = err;
-      if (!isRetryableError(err) || attempt === retries) break;
-      await delay(1000 * (attempt + 1));
     }
   }
 
-  throw lastErr;
+  throw lastErr || new Error("All Gemini API keys exhausted");
 }
 
 /**

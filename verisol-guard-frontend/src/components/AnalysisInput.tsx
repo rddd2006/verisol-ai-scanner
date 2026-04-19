@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Modules } from "@/hooks/useScan";
-import { Loader2 } from "lucide-react";
+import { Loader2, Github, Zap } from "lucide-react";
 
 type InputType = "address" | "github" | "code";
 
@@ -244,6 +244,45 @@ const AnalysisInput = ({ onAnalyze, isLoading: isScanning }: AnalysisInputProps)
               "ANALYZE NOW →"
             )}
           </button>
+
+          {/* Demo Quick Load Buttons */}
+          <div className="mt-4 grid grid-cols-2 gap-3 border-t-[3px] border-foreground pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setInput("0x1F98431c8aD98523631AE4a59f267346ea31F984");
+                setActiveTab("address");
+              }}
+              disabled={isScanning}
+              className="brutal-box-static border-[3px] border-foreground bg-background p-3 text-left hover:bg-secondary/20 disabled:opacity-50 disabled:cursor-not-allowed active:translate-x-1 active:translate-y-1"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Zap size={16} className="text-yellow-400" />
+                <span className="text-xs font-bold uppercase">Contract Address</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground font-mono truncate">
+                0x1F98431c8aD...
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setInput("https://github.com/Uniswap/v2-core");
+                setActiveTab("github");
+              }}
+              disabled={isScanning}
+              className="brutal-box-static border-[3px] border-foreground bg-background p-3 text-left hover:bg-secondary/20 disabled:opacity-50 disabled:cursor-not-allowed active:translate-x-1 active:translate-y-1"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Github size={16} className="text-orange-400" />
+                <span className="text-xs font-bold uppercase">GitHub Repo</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground font-mono truncate">
+                Uniswap/v2-core
+              </p>
+            </button>
+          </div>
         </div>
       </div>
 
